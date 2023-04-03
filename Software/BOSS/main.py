@@ -8,7 +8,7 @@ import _thread
 import gc
 #import micropython
 import random
-import select
+import os
 from BHY.bhy import BHY
 from CLED.cled import CLED
 
@@ -16,8 +16,10 @@ BOSS_Version = "1.0_beta"
 
 applications = []
 
-ESP_TX_PIN = 0
-ESP_RX_PIN = 1
+autostart_file = "autostart.txt"
+
+ESP_TX_PIN = 16
+ESP_RX_PIN = 17
 
 LED_LETTER_PIN = 18
 LED_LETTER_LEN = 2
@@ -506,7 +508,7 @@ def accelerometer():
 
             for e in events: # Loop every events read
                 if e[0] == BHY.VS_TYPE_LINEAR_ACCELERATION or e[0] == (BHY.VS_TYPE_LINEAR_ACCELERATION + BHY.BHY_SID_WAKEUP_OFFSET):
-                    cled.addAnimation(cled.ANIM_DRAW_VECTOR, [(e[2]['x'] * 4 ) / 32768, (e[2]['y'] * 4) / 32768, (e[2]['z'] * 4) / 32768, 10])
+                    cled.addAnimation(cled.ANIM_DRAW_VECTOR, [(e[2]['x'] * 16 ) / 32768, (e[2]['y'] * 16 ) / 32768, (e[2]['z'] * 16 ) / 32768, 10])
                     
     except Exception as e:
         raise e
@@ -557,6 +559,61 @@ def compass():
         # Disable orientation sensor
         sensor["sample_rate"] = 0
         bhy.configVirtualSensorWithConfig(sensor)
+
+def streamESP():
+
+    COMMAND_SENSOR = "SENSOR"
+    COMMAND_CLED = "CLED"
+    esp_uart = machine.UART(0, 115200, tx=Pin(ESP_TX_PIN), rx=Pin(ESP_RX_PIN))
+    esp_uart.init(115200, bits=8, parity=None, stop=1, tx=Pin(ESP_TX_PIN), rx=Pin(ESP_RX_PIN))
+        
+    # For good measure, flush old data
+    bhy.flushFifo() # TODO: THIS DONT WORKS AS EXPECTED
+
+    startCLED()
+
+    try:
+        while True:
+            if (not button_B.value()):
+                break
+            gc.collect()
+
+            if esp_uart.any(): # ESP has data to send us
+                #command = esp_uart.readline().decode("utf-8")
+                command = ""
+                # Read all the byte available
+                while esp_uart.any():
+                    command += esp_uart.readline().decode("utf-8")
+
+                print(command)
+                try:
+                    if command.startswith(COMMAND_SENSOR):
+                        bhy.configVirtualSensorWithConfig(eval(command[len(COMMAND_SENSOR):])) # Strip, eval and config the sensor
+                    elif command.startswith(COMMAND_CLED):
+                        to_split = command[len(COMMAND_CLED):] # Remove the leading command
+                        to_split = to_split.split("#") # Split the two part: animation name and data for that animation
+                        cled.addAnimation(to_split[0], eval(to_split[1])) # Add the animation to the queue
+                except Exception as e:
+                    print(e)
+                    pass
+                else:
+                    print("Unknown command")
+                    print(command)
+
+
+            if bhy.bhy_interrupt(): # BHY has data to send us
+                # We send to ESP all the data
+                buffer = bhy.readFIFO()
+                out = "DATA" + str(len(buffer)) + "#" + str(buffer)
+                esp_uart.write(out)
+                esp_uart.write('\n')
+            
+   
+    except Exception as e:
+        raise e
+    finally:
+        stopCLED()
+        esp_uart.deinit()
 
 def streamFifo():
     showAll = input("Show all event? [False] ")
@@ -656,15 +713,20 @@ def modeSelection(max_sel):
         sleep_ms(50)
         wheel += 1
         wheel = wheel % 255
-        waited += 1
-        if waited >= 200:
+
+        if pressed: # User is choosing, need to reset the idle time
+            waited = 0
+        else:
+            waited += 1
+
+        if waited >= 500:
             waited = 0
             print("Starting idle Animation")
             idleAnimation()
 
     return (sel % max_sel)
 
-def headlessMain():
+def headlessMain(auto_start = None):
     sleep_ms(500)
     state = 0
     fin = False
@@ -677,6 +739,19 @@ def headlessMain():
 
     # And then we set the remapping matrix
     setRemappingMatrix()
+
+    #print(applications)
+    #print(dir())
+    #print(auto_start)
+    #print(globals())
+    #print(globals()[auto_start])
+
+    if auto_start is not None: # The user configured an app to be automatically started
+        try:
+            streamESP() # TODO: fix the auto_start process
+            globals()[auto_start]()
+        except:
+            print("The application you configured to be automatically started is not available. Please check the configuration file")
 
     while not fin:
         sel = modeSelection(len(applications)) # Let the user select the application with the LED circle
@@ -836,11 +911,18 @@ if __name__ == "__main__":
         applications.append(calibrationProccess)
         applications.append(compass)
         applications.append(accelerometer)
-        # Check if we have a serial connection active
-        if (machine.mem32[SIE_STATUS] & (CONNECTED | SUSPENDED))==CONNECTED and button_B.value():
-            main()
-        else: # If we dont, we start the headless mode
-            headlessMain()
+        applications.append(streamESP)
+
+        if autostart_file in os.listdir(): # Check if we have an autostart file
+            app = open(autostart_file).read() # Read the file
+            print("Autostarting " + app) # Print the app name
+            headlessMain(app)  # Start the app
+        else:
+            # Check if we have a serial connection active
+            if (machine.mem32[SIE_STATUS] & (CONNECTED | SUSPENDED))==CONNECTED and button_B.value():
+                main()
+            else: # If we dont, we start the headless mode
+                headlessMain()
 
     except KeyboardInterrupt: # TODO: can't use it on micropython?
         print("\n\nKeyboard Interrupt catched! Use menu -99- to exit\n")

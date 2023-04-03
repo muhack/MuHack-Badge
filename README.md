@@ -9,9 +9,9 @@ Its job is to setup and stream data from the Bosh Sensor Hub BHI106B, as well as
 ```Software/``` folder contains the BOSS system and the sketch for the ESP32
 
 TODOs:
- - [ ] Connect the interrupt line of BHI to the RP2040
- - [ ] Invert TX/RX of UART between ESP32 and RP2040
- - [ ] Change to a bigger footprint of ESP32 debug port
+ - [x] Connect the interrupt line of BHI to the RP2040
+ - [x] Invert TX/RX of UART between ESP32 and RP2040
+ - [x] Change to a bigger footprint of ESP32 debug port
  - [ ] Maybe add two button for boot sel and reset for the ESP32
  - [ ] Change button battery footprint
  - [ ] Improve silkscreen text size
@@ -23,6 +23,8 @@ TODOs:
  - [ ] Maybe add a way to switch LEDs data line to the ESP32 instead of the RP2040
  - [ ] Docs and code comments
  - [ ] Remove the D16 Schottky Diode from the battery line
- 
+ - [ ] Meybe add some more cap to prevent brown-out when disconnecting USB power
+ - [ ] Add a method within BHY library to stop every sensor 
+  
  Special Thanks to:
  @gcammisa and Paolino

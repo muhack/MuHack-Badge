@@ -7,7 +7,7 @@ import gc
 
 class CLED:
 
-    ANIM_STOP_THREAD = "stopcled.ANIM_BLINK_ALLThread"
+    ANIM_STOP_THREAD = "stopcCledThread"
     ANIM_BLINK_ALL = "blinkAll"
     ANIM_GOES_ROUND = "goesRound"
     ANIM_DRAW_LEVEL = "drawLevel"
@@ -51,6 +51,8 @@ class CLED:
 
                 nextAnimation = self.animation_list.pop()
 
+                self.lock.release()
+
                 # Check the stop condition
                 if nextAnimation[0] == self.ANIM_STOP_THREAD:
                     self.is_running = False
@@ -58,7 +60,6 @@ class CLED:
                     self.np.write()
                     self.np_letter.fill((0,0,0))
                     self.np_letter.write()
-                    self.lock.release()
                     _thread.exit()
 
                 # TODO: This is the rigth way, BUT IT IS TOO SLOW!
@@ -66,19 +67,21 @@ class CLED:
                 # if nextAnimation[0] in dir(self):
                 #     animation = getattr(self, nextAnimation[0])
                 #     animation(nextAnimation[1])
-                
-                if nextAnimation[0] == self.ANIM_BLINK_ALL:
-                    self.blinkAll(nextAnimation[1][0], nextAnimation[1][1], nextAnimation[1][2] )
-                elif nextAnimation[0] == self.ANIM_GOES_ROUND:
-                    self.goesRound(nextAnimation[1][0], nextAnimation[1][1])
-                elif nextAnimation[0] == self.ANIM_DRAW_ARROW:
-                    self.drawArrow(nextAnimation[1])
-                elif nextAnimation[0] == self.ANIM_DRAW_LEVEL:
-                    self.drawLevel(nextAnimation[1][0], nextAnimation[1][1])
-                elif nextAnimation[0] == self.ANIM_DRAW_VECTOR:
-                    self.drawVector(nextAnimation[1][0], nextAnimation[1][1], nextAnimation[1][2], nextAnimation[1][3])
-                
-                self.lock.release()
+                try: # TODO: This is a workaround to avoid user suppling bad data to break everything
+                    if nextAnimation[0] == self.ANIM_BLINK_ALL:
+                        self.blinkAll(nextAnimation[1][0], nextAnimation[1][1], nextAnimation[1][2] )
+                    elif nextAnimation[0] == self.ANIM_GOES_ROUND:
+                        self.goesRound(nextAnimation[1][0], nextAnimation[1][1])
+                    elif nextAnimation[0] == self.ANIM_DRAW_ARROW:
+                        self.drawArrow(nextAnimation[1])
+                    elif nextAnimation[0] == self.ANIM_DRAW_LEVEL:
+                        self.drawLevel(nextAnimation[1][0], nextAnimation[1][1])
+                    elif nextAnimation[0] == self.ANIM_DRAW_VECTOR:
+                        self.drawVector(nextAnimation[1][0], nextAnimation[1][1], nextAnimation[1][2], nextAnimation[1][3])
+                except Exception as e:
+                    print("Error in CLED.run(): ", e)
+                    pass
+
                 gc.collect()
 
     def drawLevel(self, value, max):
@@ -218,7 +221,7 @@ class CLED:
 
             color = (delta * vector_color) // 90
             color = vector_color - color
-            if color < 10:
+            if color < 0:
                 color = 0
 
             if color > 255:
