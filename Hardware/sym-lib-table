@@ -1,7 +1,9 @@
 (sym_lib_table
+  (version 7)
   (lib (name "BHI160B")(type "Legacy")(uri "${KIPRJMOD}/IC_Bosch Sensortec_BHI160B/eec.lib")(options "")(descr ""))
   (lib (name "BMM150")(type "Legacy")(uri "${KIPRJMOD}/IC_Bosch Sensortec_BMM150/eec.lib")(options "")(descr ""))
   (lib (name "SI1967DH")(type "Legacy")(uri "${KIPRJMOD}/Trans_Vishay_SI1967DH-T1-GE3/eec.lib")(options "")(descr ""))
   (lib (name "ESP32")(type "KiCad")(uri "${KIPRJMOD}/ESP32/libraries/Espressif.kicad_sym")(options "")(descr ""))
   (lib (name "SAOv2")(type "Legacy")(uri "${KIPRJMOD}/SAOv2/Simple_Addon_v2.lib")(options "")(descr ""))
+  (lib (name "ST25DV")(type "Legacy")(uri "${KIPRJMOD}/ST25DV04K-IER6S3/ST25DV04K-IER6S3.lib")(options "")(descr ""))
 )

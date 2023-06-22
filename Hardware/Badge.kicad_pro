@@ -395,7 +395,7 @@
       "no_connect_dangling": "warning",
       "pin_not_connected": "error",
       "pin_not_driven": "error",
-      "pin_to_pin": "warning",
+      "pin_to_pin": "error",
       "power_pin_not_driven": "error",
       "similar_labels": "warning",
       "simulation_model_issue": "error",
@@ -553,6 +553,10 @@
     [
       "b7564fd4-fc1d-4256-b711-1e2fd9b24607",
       "Circle Led"
+    ],
+    [
+      "2184902f-dc25-4379-845a-b798ceaf10c9",
+      "NFC"
     ]
   ],
   "text_variables": {}
