@@ -468,6 +468,17 @@
     (uuid ff225ad1-ebea-4c86-b2ea-faf51994859a)
   )
 
+  (text "Internal tuning capacitance: 28.5 pF\nAntenna needs to be at 4.7 uH"
+    (at 113.03 46.355 0)
+    (effects (font (size 2 2) (thickness 0.4) bold) (justify left bottom))
+    (uuid 54db4b76-8820-431b-8cd9-2fc86da27bcb)
+  )
+  (text "Parameters for ST antenna desiner online tool\n--GEOMETRY--\nTurns: 10\nLength: 41mm\nWidth: 20mm\n--CONDUCTOR--\nWidth: 0.31mm\nSpacing: 0.2mm\nThickness: 35 um\n--SUBSTRATE--\nThinkness: 1mm\ner: 4.6\n"
+    (at 20.955 90.805 0)
+    (effects (font (size 2 2)) (justify left bottom) (href "https://eds.st.com/antenna/#/"))
+    (uuid c96865ee-3152-4d9b-822c-5f93923917c6)
+  )
+
   (label "NFC_V_EH" (at 107.315 75.565 0) (fields_autoplaced)
     (effects (font (size 1.27 1.27)) (justify left bottom))
     (uuid a8731c12-5ed2-429b-8438-66c2ed637831)
@@ -798,7 +809,7 @@
     (property "Value" "MuTag_NFC_Antenna" (at 64.77 86.995 0)
       (effects (font (size 1.27 1.27)) (justify left))
     )
-    (property "Footprint" "" (at 80.01 78.105 0)
+    (property "Footprint" "MuHack Badge NFC  Antenna:muhack_badge_antenna" (at 80.01 78.105 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "" (at 80.01 78.105 0)

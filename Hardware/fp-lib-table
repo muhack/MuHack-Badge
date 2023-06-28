@@ -7,4 +7,5 @@
   (lib (name "Espressif")(type "KiCad")(uri "${KIPRJMOD}/ESP32/footprints/Espressif.pretty")(options "")(descr ""))
   (lib (name "SAOv2")(type "KiCad")(uri "${KIPRJMOD}/SAOv2/Simple_Addon_v2.pretty")(options "")(descr ""))
   (lib (name "ST25DV")(type "KiCad")(uri "${KIPRJMOD}/ST25DV04K-IER6S3")(options "")(descr ""))
+  (lib (name "MuHack Badge NFC  Antenna")(type "KiCad")(uri "${KIPRJMOD}/MuHack_Badge_NFC_Antenna/footprint.pretty")(options "")(descr ""))
 )
