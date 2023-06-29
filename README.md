@@ -19,11 +19,11 @@ TODOs:
  - [x] Expose BHI's internal I2C and interrupt line (for future sensors)
  - [x] Move I2C pull-up resistor
  - [ ] Add led polarity
- - [ ] Remove power inductor (or change to an available one)
- - [ ] Maybe add a way to switch LEDs data line to the ESP32 instead of the RP2040
+ - [x] Remove power inductor (or change to an available one)
+ - [ ] ~~Maybe add a way to switch LEDs data line to the ESP32 instead of the RP2040~~
  - [ ] Docs and code comments
  - [x] Remove the D16 Schottky Diode from the battery line
- - [ ] Meybe add some more cap to prevent brown-out when disconnecting USB power
+ - [ ] ~~Maybe add some more cap to prevent brown-out when disconnecting USB power~~
  - [ ] Add a method within BHY library to stop every sensor
  - [x] Add NFC subsystem
  - [x] Add USB connector for the ESP32
