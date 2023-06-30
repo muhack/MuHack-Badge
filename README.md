@@ -14,11 +14,11 @@ TODOs:
  - [x] Change to a bigger footprint of ESP32 debug port
  - [x] Maybe add two button for boot sel and reset for the ESP32
  - [x] ~~Change~~ Remove button battery
- - [ ] Improve silkscreen text size
- - [ ] Add silkscreen label for many things (pinout, battery polarity, etc)
+ - [x] Improve silkscreen text size
+ - [x] Add silkscreen label for many things (pinout, battery polarity, etc)
  - [x] Expose BHI's internal I2C and interrupt line (for future sensors)
  - [x] Move I2C pull-up resistor
- - [ ] Add led polarity
+ - [x] Add leds and diods polarity
  - [x] Remove power inductor (or change to an available one)
  - [ ] ~~Maybe add a way to switch LEDs data line to the ESP32 instead of the RP2040~~
  - [ ] Docs and code comments
