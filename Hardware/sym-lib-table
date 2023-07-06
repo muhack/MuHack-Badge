@@ -6,4 +6,5 @@
   (lib (name "ESP32")(type "KiCad")(uri "${KIPRJMOD}/ESP32/libraries/Espressif.kicad_sym")(options "")(descr ""))
   (lib (name "SAOv2")(type "Legacy")(uri "${KIPRJMOD}/SAOv2/Simple_Addon_v2.lib")(options "")(descr ""))
   (lib (name "ST25DV")(type "Legacy")(uri "${KIPRJMOD}/ST25DV04K-IER6S3/ST25DV04K-IER6S3.lib")(options "")(descr ""))
+  (lib (name "TP4057")(type "KiCad")(uri "${KIPRJMOD}/TP4057/tp4057.kicad_sym")(options "")(descr ""))
 )
