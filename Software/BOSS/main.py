@@ -10,6 +10,7 @@ import gc
 import random
 import os
 from BHY.bhy import BHY
+from NFC.nfc import NFC
 from CLED.cled import CLED
 
 BOSS_Version = "1.0_beta"
@@ -18,33 +19,48 @@ applications = []
 
 autostart_file = "autostart.txt"
 
+## I2C PINs ##
+SCL_PIN = 23
+SDA_PIN = 22
+MAIN_I2C = I2C(1, scl=Pin(SCL_PIN), sda=Pin(SDA_PIN))
+BHY_I2C_ADDR = 0x28 # 40 in decimal, should also respond to 45
+NFC_I2C_ADDR = 0x53 # 83dec for access to user memory, Dynamic registers or Mailbox, 0x57 (87dec) for system area
+
+## Interrupts PINs ##
+NFC_INT_PIN = 11
+BHI_INT_PIN = 15
+
+## ESP32 communication PINs ##
 ESP_TX_PIN = 16
 ESP_RX_PIN = 17
+ESP_COM_PIN_45 = 12
+ESP_COM_PIN_48 = 13
+ESP_COM_PIN_47 = 14
 
+## Frontal RGB LED PINs ##
 LED_LETTER_PIN = 18
 LED_LETTER_LEN = 2
 
 LED_STRIPE_PIN = 19
 LED_STRIPE_LEN = 12
 
+## Buzzer and Buttons PINs ##
 BUZZER_PIN = 29
-
 BUTTON_A_PIN = 25
 BUTTON_B_PIN = 24
-
-SCL_PIN = 23
-SDA_PIN = 22
-BHY_I2C_ADDR = 0x28 # 40 in decimal
 
 CLED_THREAD = 0
 
 button_A = machine.Pin(BUTTON_A_PIN, Pin.IN)
 button_B = machine.Pin(BUTTON_B_PIN, Pin.IN)
 
-bhy = BHY(sda=SDA_PIN, scl=SCL_PIN, address=BHY_I2C_ADDR, stand_alone=False, debug=False)
+bhy = BHY(MAIN_I2C, address=BHY_I2C_ADDR, interrupt_pin=BHI_INT_PIN)
+nfc = NFC(MAIN_I2C, address=NFC_I2C_ADDR, interrupt_pin=NFC_INT_PIN)
 cled = CLED(LED_STRIPE_PIN, LED_STRIPE_LEN, LED_LETTER_PIN, LED_LETTER_LEN, debug=False)
 
+## Startup chime ##
 song = '0 E3 1 0;2 E4 1 0;4 E3 1 0;6 E4 1 0;8 E3 1 0;10 E4 1 0;12 E3 1 0;14 E4 1 0;16 A3 1 0;18 A4 1 0;20 A3 1 0;22 A4 1 0;24 A3 1 0;26 A4 1 0;28 A3 1 0;30 A4 1 0;32 G#3 1 0;34 G#4 1 0;36 G#3 1 0;38 G#4 1 0;40 E3 1 0;42 E4 1 0;44 E3 1 0;46 E4 1 0;48 A3 1 0;50 A4 1 0;52 A3 1 0;54 A4 1 0;56 A3 1 0;58 B3 1 0;60 C4 1 0;62 D4 1 0;64 D3 1 0;66 D4 1 0;68 D3 1 0;70 D4 1 0;72 D3 1 0;74 D4 1 0;76 D3 1 0;78 D4 1 0;80 C3 1 0;82 C4 1 0;84 C3 1 0;86 C4 1 0;88 C3 1 0;90 C4 1 0;92 C3 1 0;94 C4 1 0;96 G2 1 0;98 G3 1 0;100 G2 1 0;102 G3 1 0;104 E3 1 0;106 E4 1 0;108 E3 1 0;110 E4 1 0;114 A4 1 0;112 A3 1 0;116 A3 1 0;118 A4 1 0;120 A3 1 0;122 A4 1 0;124 A3 1 0;0 E6 1 1;4 B5 1 1;6 C6 1 1;8 D6 1 1;10 E6 1 1;11 D6 1 1;12 C6 1 1;14 B5 1 1;0 E5 1 6;4 B4 1 6;6 C5 1 6;8 D5 1 6;10 E5 1 6;11 D5 1 6;12 C5 1 6;14 B4 1 6;16 A5 1 1;20 A5 1 1;22 C6 1 1;24 E6 1 1;28 D6 1 1;30 C6 1 1;32 B5 1 1;36 B5 1 1;36 B5 1 1;37 B5 1 1;38 C6 1 1;40 D6 1 1;44 E6 1 1;48 C6 1 1;52 A5 1 1;56 A5 1 1;20 A4 1 6;16 A4 1 6;22 C5 1 6;24 E5 1 6;28 D5 1 6;30 C5 1 6;32 B4 1 6;36 B4 1 6;37 B4 1 6;38 C5 1 6;40 D5 1 6;44 E5 1 6;48 C5 1 6;52 A4 1 6;56 A4 1 6;64 D5 1 6;64 D6 1 1;68 D6 1 1;70 F6 1 1;72 A6 1 1;76 G6 1 1;78 F6 1 1;80 E6 1 1;84 E6 1 1;86 C6 1 1;88 E6 1 1;92 D6 1 1;94 C6 1 1;96 B5 1 1;100 B5 1 1;101 B5 1 1;102 C6 1 1;104 D6 1 1;108 E6 1 1;112 C6 1 1;116 A5 1 1;120 A5 1 1;72 A5 1 6;80 E5 1 6;68 D5 1 7;70 F5 1 7;76 G5 1 7;84 E5 1 7;78 F5 1 7;86 C5 1 7;88 E5 1 6;96 B4 1 6;104 D5 1 6;112 C5 1 6;120 A4 1 6;92 D5 1 7;94 C5 1 7;100 B4 1 7;101 B4 1 7;102 C5 1 7;108 E5 1 7;116 A4 1 7'
+
 sensor_config = []
 bhy_upload_try = 3
 one_shot_re_enable = [BHY.VS_TYPE_WAKEUP,
@@ -53,6 +69,10 @@ one_shot_re_enable = [BHY.VS_TYPE_WAKEUP,
                       BHY.VS_TYPE_GLANCE + BHY.BHY_SID_WAKEUP_OFFSET,
                       BHY.VS_TYPE_PICKUP,
                       BHY.VS_TYPE_PICKUP + BHY.BHY_SID_WAKEUP_OFFSET]
+
+
+## Remapping Matrix ##
+# This matrix is used to remap the sensor data to the correct axis
 
 #   | X | Y | Z |
 # Xs| 1 | 0 | 0 |
@@ -126,7 +146,7 @@ def initBhy():
         print("Uploading FAILED!")
         return False
 
-    print("Upload completed. Starging MainTask, waiting for the BMI160 to come up...")
+    print("Upload completed. Starting MainTask, waiting for the BMI160 to come up...")
     bhy.startMainTask()
     while not bhy.bhy_interrupt():
         pass
@@ -765,8 +785,8 @@ def print_menu():
     print("3. Hardware Test")
     print("4. Sensors Menu")
     print("\n5. Start streaming data")
-    print("\n6. ESP32 UART passthrough")
-    print("\n99. Drop out to REPL prompt")
+    print("\n88. ESP32 UART passthrough (WIP)")
+    print("\n\n99. Drop out to REPL prompt")
 
 uart_lock = _thread.allocate_lock()
 
@@ -791,18 +811,20 @@ def main():
 
     gc.enable()
 
+    #MAIN_I2C = I2C(1, sda=Pin(sda), scl=Pin(scl))
+
     while not fin:
         print_menu()
         sel = input("\n> ")
         if sel == "1":
             for i in range(bhy_upload_try):
                 if not initBhy():
-                    print("Retring...")
+                    print("\nFailed Upload! Retring...")
                 else:
                     break
 
         elif sel == "2":
-            bhy.dump_Chip_status()
+            print(bhy.dump_Chip_status())
         elif sel == "3":
             testHardware()
         elif sel == "4":
@@ -810,6 +832,10 @@ def main():
         elif sel == "5":
             streamFifo()
         elif sel == "6":
+            nfc.dumpMemory()
+        elif sel == "7":
+            nfc.fillMemory(b'\xAA\xBB\xCC\xDD')
+        elif sel == "88":
             UARTPassThrough()
         elif sel == "99":
             print("Bye Bye BOSS!")
