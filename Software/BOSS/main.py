@@ -1,23 +1,27 @@
 import sys
-from time import sleep_ms
+import time
+#from time import sleep_ms
 from machine import I2C, Pin, PWM, UART
 from buzzer_music.buzzer_music import music
 import binascii
 import neopixel
 import _thread
 import gc
-#import micropython
+import micropython
 import random
 import os
 from BHY.bhy import BHY
 from NFC.nfc import NFC
 from CLED.cled import CLED
 
-BOSS_Version = "1.0_beta"
+BOSS_Version = "2.0"
 
 applications = []
 
 autostart_file = "autostart.txt"
+
+# We need a special buffer for the interrupts
+micropython.alloc_emergency_exception_buf(100)
 
 ## I2C PINs ##
 SCL_PIN = 23
@@ -54,8 +58,8 @@ CLED_THREAD = 0
 button_A = machine.Pin(BUTTON_A_PIN, Pin.IN)
 button_B = machine.Pin(BUTTON_B_PIN, Pin.IN)
 
-bhy = BHY(MAIN_I2C, address=BHY_I2C_ADDR, interrupt_pin=BHI_INT_PIN)
-nfc = NFC(MAIN_I2C, address=NFC_I2C_ADDR, interrupt_pin=NFC_INT_PIN)
+bhy = BHY(MAIN_I2C, address=BHY_I2C_ADDR, int_pin=BHI_INT_PIN, debug=True)
+nfc = NFC(MAIN_I2C, address=NFC_I2C_ADDR, int_pin=NFC_INT_PIN)
 cled = CLED(LED_STRIPE_PIN, LED_STRIPE_LEN, LED_LETTER_PIN, LED_LETTER_LEN, debug=False)
 
 ## Startup chime ##
@@ -93,7 +97,10 @@ def testHardware():
                 rc_index = (i * 256 // LED_STRIPE_LEN) + j
                 led_stripe[i] = cled.wheel(rc_index & 255)
             led_stripe.write()
-            sleep_ms(10)
+            time.sleep_ms(10)
+
+        led_stripe.fill( (0,0,0) )
+        led_stripe.write()    
 
         print("Testing LED on Letters")
         for j in range(255):
@@ -101,9 +108,12 @@ def testHardware():
                 rc_index = (i * 256 // LED_LETTER_LEN) + j
                 led_letter[i] = cled.wheel(rc_index & 255)
             led_letter.write()
-            sleep_ms(10)
+            time.sleep_ms(10)
 
-        print("Testing A amb B buttons")
+        led_letter.fill( (0,0,0) )
+        led_letter.write()
+
+        print("Testing A and B buttons")
         while True:
             if button_A.value():
                 led_letter[0] = (255,0,0)
@@ -120,10 +130,11 @@ def testHardware():
 
             led_letter.write()
 
+        print("Testing Buzzer")
         mySong = music(song, pins=[Pin(BUZZER_PIN)], looping=False)
 
         while mySong.tick():
-            sleep_ms(40)
+            time.sleep_ms(40)
 
     except KeyboardInterrupt:
         print("##Hardware test aborted!##")
@@ -138,7 +149,7 @@ def testHardware():
         # De-init the neopixel object
         del led_letter
         del led_stripe
-
+        gc.collect()
 
 def initBhy():
     print("Uploading firmware to BMI160")
@@ -147,11 +158,13 @@ def initBhy():
         return False
 
     print("Upload completed. Starting MainTask, waiting for the BMI160 to come up...")
-    bhy.startMainTask()
-    while not bhy.bhy_interrupt():
+    # while not bhy.bhy_interrupt():
+    while not bhy.int_status:
+        bhy.startMainTask()
+        print(".", end='')
         pass
 
-    sleep_ms(100)
+    time.sleep_ms(100)
     return True
 
 def printSensorsList():
@@ -469,7 +482,7 @@ def idleAnimation():
 
                 cled.np.write()
                 cled.np_letter.write()
-                sleep_ms(10)
+                time.sleep_ms(10)
 
                 j += 1
                 if j >= 255:
@@ -538,7 +551,6 @@ def accelerometer():
         sensor["sample_rate"] = 0
         bhy.configVirtualSensorWithConfig(sensor)
         
-
 def compass():
     # Activate orientation sensor
     sensor = {"sensor_id": BHY.VS_TYPE_ORIENTATION,
@@ -579,6 +591,167 @@ def compass():
         # Disable orientation sensor
         sensor["sample_rate"] = 0
         bhy.configVirtualSensorWithConfig(sensor)
+
+def multi_animations_show():
+    import trickLED
+    from trickLED import animations
+    from trickLED import animations32
+    from trickLED import generators
+
+    try:
+        import uasyncio as asyncio
+    except ImportError:
+        import asyncio
+
+    tl = trickLED.TrickLED(machine.Pin(LED_STRIPE_PIN), LED_STRIPE_LEN)
+    tl_letters = trickLED.TrickLED(machine.Pin(LED_LETTER_PIN), LED_LETTER_LEN)
+
+    async def play(animation, n_frames, **kwargs):
+        try:
+            asyncio.run(animation.play(n_frames, **kwargs))
+        except Exception as e:
+            raise e
+        finally:
+            # needed to reset state otherwise the animations will get all jumbled when ended with CTRL+C
+            # asyncio.new_event_loop()
+            animation.leds.fill((0,0,0))
+            animation.leds.write()
+            # time.sleep(1)
+
+    n_frames = 1000
+    loop = asyncio.get_event_loop()
+    try:
+        while True:
+            if (not button_B.value()):
+                break
+            
+            print('Demonstrating animations press CTRL+C to cancel... or wait about 5 minutes.')
+            # store repeat_n so we can set it back if we change it
+            leds_repeat_n = tl.repeat_n
+            # LitBits
+            ani = animations.LitBits(tl)
+            ani_letters = animations.LitBits(tl_letters)
+            print('LitBits settings: default')
+            loop.run_until_complete(asyncio.gather(
+                play(ani, n_frames),
+                play(ani_letters, n_frames)
+            ))
+            
+            print('LitBits settings: lit_percent=50')
+            loop.run_until_complete(asyncio.gather(
+                play(ani, n_frames, lit_percent=50),
+                play(ani_letters, n_frames, lit_percent=50)
+            ))
+            
+            
+            # NextGen
+            ani = animations.NextGen(tl)
+            ani_letters = animations.NextGen(tl_letters)
+            print('NextGen settings: default')
+            loop.run_until_complete(asyncio.gather(
+                play(ani, n_frames),
+                play(ani_letters, n_frames)
+            ))
+            print('NextGen settings: blanks=2, interval=150')
+            loop.run_until_complete(asyncio.gather(
+                play(ani, n_frames, blanks=2, interval=150),
+                play(ani_letters, n_frames, blanks=2, interval=150)
+            ))
+            
+            # Jitter
+            ani = animations.Jitter(tl)
+            ani_letters = animations.Jitter(tl_letters)
+            print('Jitter settings: default')
+            loop.run_until_complete(asyncio.gather(
+                play(ani, n_frames),
+                play(ani_letters, n_frames)
+            ))
+            print('Jitter settings: background=0x020212, fill_mode=FILL_MODE_SOLID')
+            ani.generator = generators.random_vivid()
+            ani_letters.generator = generators.random_vivid()
+            loop.run_until_complete(asyncio.gather(
+                play(ani, n_frames, background=0x020212, fill_mode=trickLED.FILL_MODE_SOLID),
+                play(ani_letters, n_frames, background=0x020212, fill_mode=trickLED.FILL_MODE_SOLID)
+            ))
+            
+            # SideSwipe
+            ani = animations.SideSwipe(tl)
+            ani_letters = animations.SideSwipe(tl_letters)
+            print('SideSwipe settings: default')
+            loop.run_until_complete(asyncio.gather(
+                play(ani, n_frames),
+                play(ani_letters, n_frames)
+            ))
+
+            # Divergent
+            ani = animations.Divergent(tl)
+            ani_letters = animations.Divergent(tl_letters)
+            print('Divergent settings: default')
+            loop.run_until_complete(asyncio.gather(
+                play(ani, n_frames),
+                play(ani_letters, n_frames)
+            ))
+            print('Divergent settings: fill_mode=FILL_MODE_MULTI')
+            loop.run_until_complete(asyncio.gather(
+                play(ani, n_frames, fill_mode=trickLED.FILL_MODE_MULTI),
+                play(ani_letters, n_frames, fill_mode=trickLED.FILL_MODE_MULTI)
+            ))
+
+            # Convergent
+            ani = animations.Convergent(tl)
+            ani_letters = animations.Convergent(tl_letters)
+            print('Convergent settings: default')
+            loop.run_until_complete(asyncio.gather(
+                play(ani, n_frames),
+                play(ani_letters, n_frames)
+            ))
+            print('Convergent settings: fill_mode=FILL_MODE_MULTI')
+            loop.run_until_complete(asyncio.gather(
+                play(ani, n_frames, fill_mode=trickLED.FILL_MODE_MULTI),
+                play(ani_letters, n_frames, fill_mode=trickLED.FILL_MODE_MULTI)
+            ))
+
+            # if tl.n > 60 and tl.repeat_n is None:
+            #     print('Setting leds.repeat_n = 40, set it back to {} if you cancel the demo'.format(leds_repeat_n))
+            #     tl.repeat_n = 40
+
+            if 'trickLED.animations32' in sys.modules:
+                # Fire
+                ani = animations32.Fire(tl)
+                ani_letters = animations32.Fire(tl_letters)
+                print('Fire settings: default')
+                loop.run_until_complete(asyncio.gather(
+                    play(ani, n_frames),
+                    play(ani_letters, n_frames)
+                ))
+
+                # Conjuction
+                ani = animations32.Conjunction(tl)
+                ani_letters = animations32.Conjunction(tl_letters)
+
+                print('Conjuction settings: default')
+                loop.run_until_complete(asyncio.gather(
+                    play(ani, n_frames),
+                    play(ani_letters, n_frames)
+                ))
+            
+            if tl.repeat_n != leds_repeat_n:
+                tl.repeat_n = leds_repeat_n
+
+
+            del ani
+            del ani_letters
+            gc.collect()
+            print("Demo completed! Repeating...\n")
+
+                    
+    except Exception as e:
+        raise e
+    finally:
+        del tl
+        del tl_letters
+        gc.collect()
+        pass # TODO: find the correct way to clean up the variables
 
 def streamESP():
 
@@ -658,7 +831,8 @@ def streamFifo():
             gc.collect()
 
             # Wait for interrupt
-            while not bhy.bhy_interrupt():
+            while not bhy.int_status:
+                print("Waiting for interrupt")
                 pass
 
             buffer = bhy.readFIFO()
@@ -700,7 +874,7 @@ def startCLED():
         _thread.start_new_thread(cled.run, ())
         cled.is_running = True # TODO: Seems like the _thread.start_new_thread return None even if the thread had been started
 
-    sleep_ms(500) # Give some time to CLED to start
+    time.sleep_ms(500) # Give some time to CLED to start
 
 def stopCLED():
     print("Stopping CLED system.. hold on")
@@ -710,7 +884,7 @@ def stopCLED():
     else:
         print("CLED system is not running!")
 
-    sleep_ms(500) # Give some time to CLED to start
+    time.sleep_ms(500) # Give some time to CLED to start
 
 def modeSelection(max_sel):
     sel = 0
@@ -730,7 +904,7 @@ def modeSelection(max_sel):
         cled.np.fill((0,0,0))
         cled.np[sel % max_sel] = cled.wheel(wheel)
         cled.np.write()
-        sleep_ms(50)
+        time.sleep_ms(50)
         wheel += 1
         wheel = wheel % 255
 
@@ -739,7 +913,7 @@ def modeSelection(max_sel):
         else:
             waited += 1
 
-        if waited >= 500:
+        if waited >= 250:
             waited = 0
             print("Starting idle Animation")
             idleAnimation()
@@ -747,7 +921,7 @@ def modeSelection(max_sel):
     return (sel % max_sel)
 
 def headlessMain(auto_start = None):
-    sleep_ms(500)
+    time.sleep_ms(500)
     state = 0
     fin = False
     # First we try to configure the BHY
@@ -777,18 +951,43 @@ def headlessMain(auto_start = None):
         sel = modeSelection(len(applications)) # Let the user select the application with the LED circle
         print("Starting application number", sel)
         applications[sel]() # Actually call the function
-        sleep_ms(1000)
+        time.sleep_ms(1000)
+
+def NFCMenu():
+    fin = False
+    while not fin:
+        print("### NFC Menu ###")
+        print("1. Dump memory")
+        print("2. Erease memory")
+        print("3. Write memory")
+        print("\n99. Return main menu")
+
+        sel = input("\n> ")
+        if sel == "1":
+            nfc.dumpMemory()
+        elif sel == "2":
+            nfc.fillMemory(b'\x00')
+        elif sel == "3":
+            data = input("Data to write: ")
+            addr = input("Address to write: ")
+            nfc.writeToMemory(int(addr), data)
+        elif sel == "99":
+            fin = True
+        else:
+          print("Bad selection!\n")
 
 def print_menu():
     print("1. Configure i2c and upload RAM patch to BHY")
     print("2. Print BHY Internal Informations")
     print("3. Hardware Test")
     print("4. Sensors Menu")
-    print("\n5. Start streaming data")
+    print("5. NFC menu")
+    print("\n6. Start streaming data")
+
     print("\n88. ESP32 UART passthrough (WIP)")
     print("\n\n99. Drop out to REPL prompt")
 
-uart_lock = _thread.allocate_lock()
+#uart_lock = _thread.allocate_lock()
 
 def from_stdin_to_uart(uart, a):
     while True:
@@ -830,11 +1029,13 @@ def main():
         elif sel == "4":
             sensorsMenu()
         elif sel == "5":
-            streamFifo()
+            NFCMenu()
         elif sel == "6":
-            nfc.dumpMemory()
+            streamFifo()
+        #elif sel == "6":
+        #    nfc.dumpMemory()
         elif sel == "7":
-            nfc.fillMemory(b'\xAA\xBB\xCC\xDD')
+            multi_animations_show()
         elif sel == "88":
             UARTPassThrough()
         elif sel == "99":
@@ -848,9 +1049,9 @@ def startUpAnimation():
     cled.fillFromBottom((0,255,0), 100)
     mySong = music(startup_chime, pins=[Pin(BUZZER_PIN)], looping=False)
     while mySong.tick():
-        sleep_ms(40)
+        time.sleep_ms(40)
 
-    sleep_ms(100)
+    time.sleep_ms(100)
     cled.clear()
     cled.np.write()
 
@@ -934,10 +1135,11 @@ if __name__ == "__main__":
 
         startUpAnimation()
 
-        applications.append(calibrationProccess)
         applications.append(compass)
         applications.append(accelerometer)
-        applications.append(streamESP)
+        #applications.append(streamESP)
+        applications.append(multi_animations_show)
+        applications.append(calibrationProccess)
 
         if autostart_file in os.listdir(): # Check if we have an autostart file
             app = open(autostart_file).read() # Read the file

@@ -5,12 +5,12 @@ import struct
 
 class NFC:
 
-    def __init__(self, MAIN_I2C, address=0x53, interrupt_pin = 0, board_version = 2, debug = False):
+    def __init__(self, MAIN_I2C, address=0x53, int_pin = 0, board_version = 2, debug = False):
         self.i2c = MAIN_I2C
         self.board_version = board_version
 
-        if interrupt_pin:
-            self.int_pin = Pin(interrupt_pin)
+        if int_pin:
+            self.int_pin = Pin(int_pin)
         else:
             self.int_pin = 0
 
