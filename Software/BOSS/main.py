@@ -158,7 +158,9 @@ def initBhy():
         return False
 
     print("Upload completed. Starting MainTask, waiting for the BMI160 to come up...")
+    print("int_status:", bhy.int_status)
     # while not bhy.bhy_interrupt():
+    bhy.startMainTask()
     while not bhy.int_status:
         bhy.startMainTask()
         print(".", end='')
@@ -824,7 +826,7 @@ def streamFifo():
     # For good measure, flush old data
     bhy.flushFifo() # TODO: THIS DONT WORKS AS EXPECTED
 
-    startCLED()
+    #startCLED()
 
     try:
         while True:
@@ -886,12 +888,23 @@ def stopCLED():
 
     time.sleep_ms(500) # Give some time to CLED to start
 
+def wakeup():
+    pass
+
+def isSleepRequested():
+    pass
+
 def modeSelection(max_sel):
     sel = 0
     wheel = 0
     pressed = False
     waited = 0
     while True:
+        if isSleepRequested():
+            print("Sleep requested! Going to deepsleep...")
+            machine.deepsleep()
+            break
+
         if (not button_B.value()):
             break
 
@@ -917,11 +930,13 @@ def modeSelection(max_sel):
             waited = 0
             print("Starting idle Animation")
             idleAnimation()
+            # print("Sleep requested! Going to deepsleep...")
+            # machine.deepsleep()
 
     return (sel % max_sel)
 
 def headlessMain(auto_start = None):
-    time.sleep_ms(500)
+    time.sleep_ms(100)
     state = 0
     fin = False
     # First we try to configure the BHY
@@ -934,11 +949,8 @@ def headlessMain(auto_start = None):
     # And then we set the remapping matrix
     setRemappingMatrix()
 
-    #print(applications)
-    #print(dir())
-    #print(auto_start)
-    #print(globals())
-    #print(globals()[auto_start])
+    # Then we install the wakeup interrupt
+    machine.Pin(NFC_INT_PIN).irq(trigger=Pin.IRQ_RISING, handler=wakeup)
 
     if auto_start is not None: # The user configured an app to be automatically started
         try:
@@ -1127,10 +1139,10 @@ if __name__ == "__main__":
     try:
         gc.enable()
         
+        # Turn off all the LEDs
         cled.clear()
         cled.np.write()
         cled.clearLetter()
-        
         cled.np_letter.write()
 
         startUpAnimation()

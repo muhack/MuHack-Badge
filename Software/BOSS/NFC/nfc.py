@@ -10,12 +10,17 @@ class NFC:
         self.board_version = board_version
 
         if int_pin:
-            self.int_pin = Pin(int_pin)
+            self.int_pin = Pin(int_pin, Pin.IN)
+            self.int_pin.irq(trigger=Pin.IRQ_RISING , handler=self.nfc_int_handler)
         else:
             self.int_pin = 0
 
         self.NFC_ADDR = address
         self.debug = debug
+
+
+    def nfc_int_handler(self, pin):
+        print("--------NFC Interrupt!!!")
 
     def printDebug(self, msg):
         if self.debug:
