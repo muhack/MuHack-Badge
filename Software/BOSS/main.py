@@ -10,6 +10,8 @@ import gc
 import micropython
 import random
 import os
+import math
+
 from BHY.bhy import BHY
 from NFC.nfc import NFC
 from CLED.cled import CLED
@@ -58,8 +60,8 @@ CLED_THREAD = 0
 button_A = machine.Pin(BUTTON_A_PIN, Pin.IN)
 button_B = machine.Pin(BUTTON_B_PIN, Pin.IN)
 
-bhy = BHY(MAIN_I2C, address=BHY_I2C_ADDR, int_pin=BHI_INT_PIN, debug=True)
-nfc = NFC(MAIN_I2C, address=NFC_I2C_ADDR, int_pin=NFC_INT_PIN)
+bhy = BHY(MAIN_I2C, address=BHY_I2C_ADDR, int_pin=BHI_INT_PIN, debug=False)
+nfc = NFC(MAIN_I2C, address=NFC_I2C_ADDR, int_pin=NFC_INT_PIN, debug=False)
 cled = CLED(LED_STRIPE_PIN, LED_STRIPE_LEN, LED_LETTER_PIN, LED_LETTER_LEN, debug=False)
 
 ## Startup chime ##
@@ -158,13 +160,18 @@ def initBhy():
         return False
 
     print("Upload completed. Starting MainTask, waiting for the BMI160 to come up...")
-    print("int_status:", bhy.int_status)
+    # print("int_status:", bhy.int_status)
     # while not bhy.bhy_interrupt():
     bhy.startMainTask()
     while not bhy.int_status:
         bhy.startMainTask()
         print(".", end='')
         pass
+
+    time.sleep_ms(100)
+
+    # And then we set the remapping matrix
+    setRemappingMatrix()
 
     time.sleep_ms(100)
     return True
@@ -755,6 +762,109 @@ def multi_animations_show():
         gc.collect()
         pass # TODO: find the correct way to clean up the variables
 
+def ball():
+    ball_mass = 1 # kg
+    ball_velocity = 0 # rad/s
+    ball_position = 0 # rad
+    time_resolution = 0.1 # s
+
+    friction = 20 
+
+    acceleration_x = 0
+    acceleration_y = 0
+    acceleration_z = 0
+
+    # Activate orientation sensor
+    sensor = {"sensor_id": BHY.VS_TYPE_ACCELEROMETER,
+              "wakeup_status": False,
+              "sample_rate": 25,
+              "max_report_latency_ms": 0,
+              "flush_sensor": 0,
+              "change_sensitivity": 0,
+              "dynamic_range": 0
+             }
+    bhy.configVirtualSensorWithConfig(sensor)
+
+    startCLED()
+
+    try:
+        while True:
+            start_time = time.ticks_us()
+            if (not button_B.value()):
+                break
+            gc.collect()
+
+            if bhy.bhy_interrupt(): # BHY has data to send us
+                buffer = bhy.readFIFO()
+
+                events = bhy.parse_fifo(buffer, False) # Dont pass the filters if we want to show everythings
+
+                for e in events: # Loop every events read
+                    if e[0] == BHY.VS_TYPE_ACCELEROMETER or e[0] == (BHY.VS_TYPE_ACCELEROMETER + BHY.BHY_SID_WAKEUP_OFFSET):
+                        acceleration_x = (e[2]['x'] * 8192 * 4 ) / 32768
+                        acceleration_y = (e[2]['y'] * 8192 * 4 ) / 32768
+                        acceleration_z = (e[2]['z'] * 8192 * 4 ) / 32768
+
+                        #cled.addAnimation(cled.ANIM_DRAW_VECTOR, [(e[2]['x'] * 16 ) / 32768, (e[2]['y'] * 16 ) / 32768, (e[2]['z'] * 16 ) / 32768, 10])
+            # else:
+            #     acceleration_x = 0
+            #     acceleration_y = 0
+            #     acceleration_z = 0
+
+            #print("Acceleration data:", acceleration_x, acceleration_y, acceleration_z)
+
+
+            # Calculate the acceleration module (Pythagorean theorem)
+            acceleration = int(math.sqrt(acceleration_x*acceleration_x + acceleration_y*acceleration_y ))
+
+            #print("Acceleration module:", acceleration)
+
+            # Calculate the angle beetwen the force vector and the ball position
+            acceleration_angle = int(math.atan2(acceleration_y, acceleration_x) * 180 // math.pi) # Convert from rad to deg
+            #acceleration_angle = int(math.atan2(acceleration_y, acceleration_x))
+            # if acceleration_angle < 0:
+            #     acceleration_angle = 360 + acceleration_angle
+
+            angle = abs(acceleration_angle - ball_position) # deg
+
+            # Calculate the tangential acceleration
+            tangential_acceleration = int(math.sin(math.radians(angle)) * acceleration)
+
+            # Friction (calculated by a fair dice roll)
+            if acceleration_angle > 0:
+                tangential_acceleration += -friction
+            else:
+                tangential_acceleration += friction
+
+            #print("Tangential acceleration:", tangential_acceleration)
+
+
+            time_resolution = time.ticks_diff(time.ticks_us(), start_time) / 1000000
+            # Calculate the new velocity
+            ball_velocity += tangential_acceleration * time_resolution 
+            #print("Ball velocity:", ball_velocity)
+
+            # Calculate the new position
+            ball_position += (ball_velocity * time_resolution) + (0.5 * tangential_acceleration * time_resolution * time_resolution)
+
+
+            print("Ball pos: " + str(ball_position) + 
+                  "\t- Ball vel: " + str(ball_velocity) + 
+                  "\t- Tang acc: " + str(tangential_acceleration))
+
+            #cled.drawArrow(ball_position % 360)
+
+            #Draw the ball
+            cled.addAnimation(cled.ANIM_DRAW_ARROW, ball_position)
+                    
+    except Exception as e:
+        raise e
+    finally:
+        stopCLED()
+        # Disable orientation sensor
+        sensor["sample_rate"] = 0
+        bhy.configVirtualSensorWithConfig(sensor)
+
 def streamESP():
 
     COMMAND_SENSOR = "SENSOR"
@@ -928,10 +1038,10 @@ def modeSelection(max_sel):
 
         if waited >= 250:
             waited = 0
-            print("Starting idle Animation")
-            idleAnimation()
-            # print("Sleep requested! Going to deepsleep...")
-            # machine.deepsleep()
+            # print("Starting idle Animation")
+            # idleAnimation()
+            print("Sleep requested! Going to deepsleep...")
+            machine.deepsleep()
 
     return (sel % max_sel)
 
@@ -946,11 +1056,10 @@ def headlessMain(auto_start = None):
         else:
             break
 
-    # And then we set the remapping matrix
-    setRemappingMatrix()
-
     # Then we install the wakeup interrupt
-    machine.Pin(NFC_INT_PIN).irq(trigger=Pin.IRQ_RISING, handler=wakeup)
+    # Pin.irq(handler=None, trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING, *, priority=1, wake=None, hard=False)
+    #machine.Pin(NFC_INT_PIN).irq(trigger=Pin.IRQ_RISING, handler=wakeup, wake=machine.DEEPSLEEP)
+    #nfc_gpo = machine.Pin(NFC_INT_PIN, machine.Pin.IN)
 
     if auto_start is not None: # The user configured an app to be automatically started
         try:
@@ -1133,6 +1242,17 @@ def printWelcome():
 
 if __name__ == "__main__":
     print("Starting...")
+    # import lowpower
+    # time.sleep_ms(1000)
+    # print("before dormant")
+    # btn6 = Pin(BUTTON_A_PIN, Pin.IN)
+    # btn6.irq(lambda e: print("button 6 event!"), Pin.IRQ_RISING | Pin.IRQ_FALLING) 
+    # lowpower.dormant_until_pin(BUTTON_A_PIN)
+    # # lowpower.dormant_with_modes({
+    # #     NFC_INT_PIN: (lowpower.EDGE_LOW | lowpower.EDGE_HIGH),
+    # # })
+    # print("after dormant") # only print after receiving signal on Pin number DORMANT_PIN
+
     SIE_STATUS=const(0x50110000+0x50)
     CONNECTED=const(1<<16)
     SUSPENDED=const(1<<4)
@@ -1151,7 +1271,8 @@ if __name__ == "__main__":
         applications.append(accelerometer)
         #applications.append(streamESP)
         applications.append(multi_animations_show)
-        applications.append(calibrationProccess)
+        applications.append(ball)
+        #applications.append(calibrationProccess)
 
         if autostart_file in os.listdir(): # Check if we have an autostart file
             app = open(autostart_file).read() # Read the file

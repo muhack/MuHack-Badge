@@ -9,11 +9,11 @@ class NFC:
         self.i2c = MAIN_I2C
         self.board_version = board_version
 
-        if int_pin:
-            self.int_pin = Pin(int_pin, Pin.IN)
-            self.int_pin.irq(trigger=Pin.IRQ_RISING , handler=self.nfc_int_handler)
-        else:
-            self.int_pin = 0
+        # if int_pin:
+        #     self.int_pin = Pin(int_pin, Pin.IN)
+        #     self.int_pin.irq(trigger=Pin.IRQ_RISING , handler=self.nfc_int_handler)
+        # else:
+        #     self.int_pin = 0
 
         self.NFC_ADDR = address
         self.debug = debug
