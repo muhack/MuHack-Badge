@@ -1,3 +1,17 @@
+# MuHack Badge BOSS firmware
+# Copyright (C) 2021 MrMoDDoM
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Affero General Public License v3.0
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 import sys
 import time
 #from time import sleep_ms
@@ -763,12 +777,12 @@ def multi_animations_show():
         pass # TODO: find the correct way to clean up the variables
 
 def ball():
-    ball_mass = 1 # kg
+    time.sleep_ms(500)
     ball_velocity = 0 # rad/s
     ball_position = 0 # rad
     time_resolution = 0.1 # s
 
-    friction = 20 
+    friction = 40 # (calculated by a fair dice roll)
 
     acceleration_x = 0
     acceleration_y = 0
@@ -785,8 +799,6 @@ def ball():
              }
     bhy.configVirtualSensorWithConfig(sensor)
 
-    startCLED()
-
     try:
         while True:
             start_time = time.ticks_us()
@@ -801,67 +813,49 @@ def ball():
 
                 for e in events: # Loop every events read
                     if e[0] == BHY.VS_TYPE_ACCELEROMETER or e[0] == (BHY.VS_TYPE_ACCELEROMETER + BHY.BHY_SID_WAKEUP_OFFSET):
-                        acceleration_x = (e[2]['x'] * 8192 * 4 ) / 32768
-                        acceleration_y = (e[2]['y'] * 8192 * 4 ) / 32768
-                        acceleration_z = (e[2]['z'] * 8192 * 4 ) / 32768
-
-                        #cled.addAnimation(cled.ANIM_DRAW_VECTOR, [(e[2]['x'] * 16 ) / 32768, (e[2]['y'] * 16 ) / 32768, (e[2]['z'] * 16 ) / 32768, 10])
-            # else:
-            #     acceleration_x = 0
-            #     acceleration_y = 0
-            #     acceleration_z = 0
-
-            #print("Acceleration data:", acceleration_x, acceleration_y, acceleration_z)
-
+                        acceleration_x = e[2]['x']
+                        acceleration_y = e[2]['y']
+                        acceleration_z = e[2]['z']
 
             # Calculate the acceleration module (Pythagorean theorem)
             acceleration = int(math.sqrt(acceleration_x*acceleration_x + acceleration_y*acceleration_y ))
 
-            #print("Acceleration module:", acceleration)
 
             # Calculate the angle beetwen the force vector and the ball position
             acceleration_angle = int(math.atan2(acceleration_y, acceleration_x) * 180 // math.pi) # Convert from rad to deg
-            #acceleration_angle = int(math.atan2(acceleration_y, acceleration_x))
-            # if acceleration_angle < 0:
-            #     acceleration_angle = 360 + acceleration_angle
-
             angle = abs(acceleration_angle - ball_position) # deg
 
             # Calculate the tangential acceleration
             tangential_acceleration = int(math.sin(math.radians(angle)) * acceleration)
 
-            # Friction (calculated by a fair dice roll)
-            if acceleration_angle > 0:
-                tangential_acceleration += -friction
-            else:
+            # Applay friction to slow down the ball
+            if tangential_acceleration > friction:
+                tangential_acceleration -= friction
+            elif tangential_acceleration < -friction:
                 tangential_acceleration += friction
-
-            #print("Tangential acceleration:", tangential_acceleration)
-
+            else:
+                tangential_acceleration = 0
 
             time_resolution = time.ticks_diff(time.ticks_us(), start_time) / 1000000
             # Calculate the new velocity
             ball_velocity += tangential_acceleration * time_resolution 
-            #print("Ball velocity:", ball_velocity)
 
             # Calculate the new position
             ball_position += (ball_velocity * time_resolution) + (0.5 * tangential_acceleration * time_resolution * time_resolution)
 
+            ball_position = ball_position % 360
 
-            print("Ball pos: " + str(ball_position) + 
-                  "\t- Ball vel: " + str(ball_velocity) + 
-                  "\t- Tang acc: " + str(tangential_acceleration))
-
-            #cled.drawArrow(ball_position % 360)
+            # print("Ball pos: " + str(ball_position) + 
+            #       "\t- Ball vel: " + str(ball_velocity) + 
+            #       "\t- Tang acc: " + str(tangential_acceleration))
 
             #Draw the ball
-            cled.addAnimation(cled.ANIM_DRAW_ARROW, ball_position)
+            cled.drawBall(ball_position)
                     
     except Exception as e:
         raise e
     finally:
-        stopCLED()
-        # Disable orientation sensor
+        # Disable the sensor
         sensor["sample_rate"] = 0
         bhy.configVirtualSensorWithConfig(sensor)
 
@@ -1010,10 +1004,10 @@ def modeSelection(max_sel):
     pressed = False
     waited = 0
     while True:
-        if isSleepRequested():
-            print("Sleep requested! Going to deepsleep...")
-            machine.deepsleep()
-            break
+        # if isSleepRequested():
+        #     print("Sleep requested! Going to deepsleep...")
+        #     machine.deepsleep()
+        #     break
 
         if (not button_B.value()):
             break
@@ -1038,10 +1032,10 @@ def modeSelection(max_sel):
 
         if waited >= 250:
             waited = 0
-            # print("Starting idle Animation")
-            # idleAnimation()
-            print("Sleep requested! Going to deepsleep...")
-            machine.deepsleep()
+            print("Starting idle Animation")
+            idleAnimation()
+            # print("Sleep requested! Going to deepsleep...")
+            # machine.deepsleep()
 
     return (sel % max_sel)
 
@@ -1063,7 +1057,6 @@ def headlessMain(auto_start = None):
 
     if auto_start is not None: # The user configured an app to be automatically started
         try:
-            streamESP() # TODO: fix the auto_start process
             globals()[auto_start]()
         except:
             print("The application you configured to be automatically started is not available. Please check the configuration file")

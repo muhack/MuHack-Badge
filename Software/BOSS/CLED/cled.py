@@ -151,6 +151,30 @@ class CLED:
             self.np[i]= (int(r),int(g),int(b))
 
         self.np.write()
+
+    def drawBall(self, angle):
+        color = 255
+
+        vector_color = 255
+
+        for i in range(self.lenLed):
+            step_angle = i * 30
+            delta = abs(angle - step_angle)
+            if delta > 180:
+                delta = -delta % 180
+
+            color = (delta * vector_color) // 45
+            color = vector_color - color
+            if color < 0:
+                color = 0
+
+            if color > 255:
+                color = 255
+            
+            self.np[i] = (int(color),0,0) #self.wheelRB(int(color))
+
+        self.np.write()
+
     
     # def drawArrow(self, data):
     #     # self.len=12 
