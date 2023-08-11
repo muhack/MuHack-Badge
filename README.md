@@ -1,12 +1,18 @@
 # MuHack-Badge
 Official repository for MuHack Badge.
 
+![Badge startup](/image/startup.gif)
+
 The board features an RP2040 as main microcontroller running micropython.
-Its job is to setup and stream data from the Bosh Sensor Hub BHI106B, as well as controlling the LEDs.
+Its job is to setup and stream data from the Bosh Sensor Hub BHI106(B), as well as controlling the LEDs.
 
 ```Hardware/``` folder contains the KiCad project
 
-```Software/``` folder contains the BOSS system and the sketch for the ESP32
+```Software/``` folder contains the BOSS system and the sketches for the ESP32 (WIP)
+
+> **NOTE: The software is still in development, so expect A LOT OF bugs and missing features.**
+
+![Badge rotate](/image/rotate.gif)
 
 ## Chagelog v2
 
@@ -17,7 +23,10 @@ Its job is to setup and stream data from the Bosh Sensor Hub BHI106B, as well as
  - Added a button for the ESP32
  - WIP: firmware update for better BHI support
 
-TODOs:
+## Chagelog v1
+ - Initial release
+
+## TODOs:
  - [x] Connect the interrupt line of BHI to the RP2040
  - [x] Invert TX/RX of UART between ESP32 and RP2040
  - [x] Change to a bigger footprint of ESP32 debug port
